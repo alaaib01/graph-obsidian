@@ -1,22 +1,20 @@
 import { Plugin } from "obsidian";
 
-// Helper function to parse options from the markdown block
-function parseOptions(source: string) {
+// Helper function to parse options and commands from the markdown block
+function parseOptionsAndCommands(source: string) {
   const lines = source.split("\n");
   const configLine = lines[0].trim();
 
   let ggbAppletOptions = {
-    id: "ggbApplet",
-    width: 800,
-    height: 600,
-    showToolBar: false,
-    showMenuBar: false,
-    showAlgebraInput: false,
-    showResetIcon: true,
-    enableLabelDrags: false,
-    enableShiftDragZoom: true,
-    useBrowserForJS: false,
-    appletOnLoad: () => {}
+    "appName": "graphing", // Default app type, can be changed
+    "width": 800,
+    "height": 600,
+    "showToolBar": false,
+    "showAlgebraInput": false,
+    "showMenuBar": false,
+    "enableShiftDragZoom": true,
+    "enableRightClick": false,
+    "capturingThreshold": null
   };
 
   if (configLine.startsWith("{") && configLine.endsWith("}")) {
@@ -30,7 +28,7 @@ function parseOptions(source: string) {
     }
   }
 
-  return { ggbAppletOptions, source };
+  return { ggbAppletOptions, commands: source.trim() };
 }
 
 export default class GeoGebraPlugin extends Plugin {
@@ -39,42 +37,35 @@ export default class GeoGebraPlugin extends Plugin {
 
     // Register a markdown code block processor for 'geogebra'
     this.registerMarkdownCodeBlockProcessor("geogebra", (source, el, ctx) => {
-      const { ggbAppletOptions, source: commands } = parseOptions(source);
+      const { ggbAppletOptions, commands } = parseOptionsAndCommands(source);
 
       // Create a div for rendering the GeoGebra applet
       const container = document.createElement("div");
-      container.id = ggbAppletOptions.id;
+      container.id = "ggbApplet";
       container.style.width = `${ggbAppletOptions.width}px`;
       container.style.height = `${ggbAppletOptions.height}px`;
       el.appendChild(container);
 
-      // Load GeoGebra JS API from CDN
+      // Load GeoGebra API
       const script = document.createElement("script");
       script.src = "https://www.geogebra.org/apps/deployggb.js";
       script.charset = "UTF-8";
       document.head.appendChild(script);
 
       script.onload = () => {
-        // Initialize the GeoGebra applet
-        const ggbApplet = new (window as any).GGBApplet(ggbAppletOptions, true);
-        ggbApplet.inject(container.id);
+        // Initialize the GeoGebra applet with the user-defined options
+        const applet = new (window as any).GGBApplet(ggbAppletOptions, true);
+        applet.inject(container.id);
 
-        // Set dark mode background and customize axes/grid colors
-        ggbAppletOptions.appletOnLoad = () => {
-          ggbApplet.setColor("xAxis", 255, 255, 255); // White axes
-          ggbApplet.setColor("yAxis", 255, 255, 255); // White axes
-          ggbApplet.setGridVisible(true);
-          ggbApplet.setGridColor(200, 200, 200); // Light gray grid
-          ggbApplet.setBackgroundColor(0, 0, 0); // Dark background
-          ggbApplet.setCoordSystem(-10, 10, -10, 10); // Adjust coord system if needed
-
-          const commandList = commands.split("\n").filter(cmd => cmd.trim() !== "");
-
-          // Pass each command to the applet
-          commandList.forEach(command => {
-            ggbApplet.evalCommand(command);
-          });
-        };
+        // Apply custom commands after the applet loads
+        applet.registerClientListener(() => {
+          if (commands) {
+            const commandList = commands.split("\n").filter(cmd => cmd.trim() !== "");
+            commandList.forEach((command: string) => {
+              applet.evalCommand(command);
+            });
+          }
+        });
       };
     });
   }
