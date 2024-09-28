@@ -1,6 +1,5 @@
 import { Plugin } from "obsidian";
 
-// Main plugin class
 export default class JSXGraphPlugin extends Plugin {
   async onload() {
     console.log("JSXGraph Plugin loaded!");
@@ -18,19 +17,24 @@ export default class JSXGraphPlugin extends Plugin {
       script.src = "https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraphcore.js";
       document.head.appendChild(script);
 
-      // When the script is loaded, render the graph
+      // Once the script is loaded, render the graph
       script.onload = () => {
         const board = (window as any).JXG.JSXGraph.initBoard(container, {
           boundingbox: [-5, 5, 5, -5],
           axis: true
         });
 
-        // Try to evaluate the code from the markdown block
+        // Create the function dynamically, injecting 'board' as the context
         try {
+          // Directly execute the source as JS inside a function context
+          // We use eval here for simplicity, but caution should be taken in production
           const graphCode = new Function("board", source);
-          graphCode(board);
+          graphCode(board); // Execute the JSXGraph code from the markdown block
         } catch (e) {
           console.error("Error in JSXGraph code:", e);
+          const errorDiv = document.createElement("div");
+          errorDiv.textContent = `Error in JSXGraph code: ${e.message}`;
+          el.appendChild(errorDiv);
         }
       };
     });
